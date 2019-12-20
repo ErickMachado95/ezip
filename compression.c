@@ -2,16 +2,17 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <unistd.h>
 #include "compression.h"
 
 //comment out for debugging purposes
 #define DEBUG 
 
-bool compression(FILE* file){
-
-		
+bool compression(FILE* file, FILE* comp_file){
+	
 	ascii_node** index_list = (ascii_node**) malloc(sizeof(ascii_node*)*256);
-	if(index_list == NULL) {return false;} // failed to compress
+	if(index_list == NULL) 
+		return false; // failed to compress
 	
 	char ch = getc(file); 
 
@@ -20,6 +21,8 @@ bool compression(FILE* file){
 		increment_char_count(index_list,ch);
 		ch = getc(file);
 	}
+
+	rewind(file);
 
 	#ifdef DEBUG
 		print_char_frequency(index_list,256);
@@ -34,14 +37,28 @@ bool compression(FILE* file){
 	}
 
 	ascii_node** full_list = (ascii_node**) malloc(sizeof(ascii_node*)*char_count);
+	
+	if(full_list == NULL){
+		free(index_list);
+		return false; 
+	}
 
+	/* makes a complete list absent of NULLs */
 	for(int i = 0, k = 0 ; (i < 256) && (k < char_count) ; i++){
 		if(index_list[i] != NULL){ 
 			full_list[k++] = index_list[i]; 		
 		}
 	}
+	
+	huff_node* root = huffman_process(full_list,char_count);
+	
+	write_compressed_file(file, comp_file,index_list,char_count,root);
 
-	huffman_process(full_list,char_count);	
+	for( int i = 0 ; i < char_count; i++){
+		free_ascii_node(full_list[i]);	
+	}
+	free(full_list);
+	free(index_list);
 }
 
 /* returns a newly initialized ascii_node_list */
@@ -76,6 +93,15 @@ ascii_node*  new_ascii_node(char ch){
 	return an;
 }
 
+/* frees ascii_node include the pointer to char_code*/
+/*input: ascii code to be freed */
+/*output: none */
+void free_ascii_node(ascii_node* an){
+	if(an == NULL){ return; }
+	free(an->cc);
+	free(an); 
+}
+
 /* orders a given ascii_list from lowest frequency to highest*/
 /*input: ascii_node_list */
 /*output: ordered list */
@@ -100,9 +126,9 @@ huff_node* new_huff_node(int value,bool inter,ascii_node* an){
 
 /*huffman process takes an ascii_node list and uses huffman coding to create a code*/
 /*input: ascii_node list*/
-/*output: returns true if succesfully gives code to each character, false otherwise*/
+/*output: returns root of huffman tree */
 
-bool huffman_process(ascii_node** list, int list_len){
+huff_node*  huffman_process(ascii_node** list, int list_len){
 	
 	if(list_len == 1){} ; // special case of list being 1	
 	huff_node** huff_tree = (huff_node**) malloc(sizeof(huff_node*)*list_len);
@@ -149,7 +175,7 @@ bool huffman_process(ascii_node** list, int list_len){
 
 	code_assignment(root);
 	free(huff_tree);
-	return true;	
+	return root;	
 }
 
 /*Assigns code to each of the characters found in a file */
@@ -166,7 +192,8 @@ void code_assignment(huff_node* tree){
 	right->code[0] = right_path(right->code[0],0);
 	code_assignment_recurs(tree->left,left);
 	code_assignment_recurs(tree->right,right);
-		
+	free(left);
+	free(right);	
 
 }
 
@@ -188,7 +215,7 @@ void code_assignment_recurs(huff_node* root ,char_code* cd){
 		if(root->left != NULL){
 			char_code* left = (char_code*) malloc(sizeof(char_code));
 			char_code_copy(left,cd); 
-			left->code[left->length/32] = left_path(left->code[left->length/32],(left->length-1)%32);
+			left->code[left->length/8] = left_path(left->code[left->length/8],(left->length-1)%8);
 			code_assignment_recurs(root->left, left);
 			free(left);
 			
@@ -197,7 +224,7 @@ void code_assignment_recurs(huff_node* root ,char_code* cd){
 		if(root->right != NULL){
 			char_code* right = (char_code*) malloc(sizeof(char_code));
 			char_code_copy(right,cd); 
-			right->code[right->length/32] = right_path(right->code[right->length/32],(right->length-1)%32);
+			right->code[right->length/8] = right_path(right->code[right->length/8],(right->length-1)%8);
 			code_assignment_recurs(root->right,right);
 			free(right);
 		}
@@ -208,11 +235,77 @@ void code_assignment_recurs(huff_node* root ,char_code* cd){
 /* copies char_code of src to dest*/ 
 void char_code_copy(char_code* dest, char_code* src){
 	
-	for(int i = 0 ; i < 8 ; i++){
+	for(int i = 0 ; i < 32 ; i++){
 		dest->code[i] = src->code[i];
 	}
 	
 	dest->length = src->length; 
+}
+
+/* writes to compressed version of a file */
+/*input: file to be compressed (src), compression destination (dest), ascii_node list that holds code*/
+/*output: true if successful, false otherwise */
+bool write_compressed_file(FILE* src, FILE* dest,ascii_node** list,int list_len, huff_node* root){
+	
+	uint32_t byte_count = 0; // assumes files will be no larger than 1GB /*may be changed later for larger files */
+	char ch = getc(src);
+        while(ch != EOF){
+		byte_count++;
+		ch = getc(src);
+	}
+
+
+	rewind(src);
+	fwrite(&byte_count, sizeof(uint32_t),1,dest);
+	write_huffman_tree(dest,root);		
+
+	ch = getc(src);
+	uint8_t index; 
+	char data =0 ; 
+	char_code* cc; 
+	uint8_t char_left = 8; 
+	while(ch != EOF){
+		index = (uint8_t) ch; 	
+		cc = list[index]->cc;
+		uint32_t code_index = 0;	
+		while(code_index < cc->length){
+			int iter = (cc->length-code_index) < char_left ? (cc->length-code_index) : char_left;
+			char temp;
+			for(int i = 0; i < iter; i++){
+				temp = (char) cc->code[code_index/8]; 
+				temp = temp & (0x01 << (7-(code_index%8))); 
+				data = data | (temp); 	
+				code_index++; 
+				char_left--; 
+			}	
+
+			if(char_left == 0){
+				char_left = 8; 
+				fwrite(&data,sizeof(char),1,dest);
+				/*#ifdef DEBUG*/
+					/*printf("%c",data);*/
+				/*#endif*/
+			}		
+		}
+
+		ch = getc(src);
+
+	}
+	return true;
+
+}
+
+void write_huffman_tree(FILE* file, huff_node* root){
+	bool leaf = false;
+	if(root->left == NULL && root->right == NULL){
+		leaf = true;	
+		fwrite(&leaf, sizeof(bool),1,file);
+		fwrite(&root->an->ascii_char,sizeof(char),1,file);
+	}else{
+		fwrite(&leaf,sizeof(bool),1,file);	
+		write_huffman_tree(file,root->left);
+		write_huffman_tree(file,root->right);
+	}
 }
 
 /* debug functions */
@@ -240,10 +333,10 @@ void code_print(char_code* cc){
 
 		/*printf("%x ",cc->code[i]) ; */
 	/*}*/
-	for(int i = 0 ; i < (cc->length+31)/32 ; i++){
-		int iter = code_left < 32 ? code_left : 32 ; 
+	for(int i = 0 ; i < (cc->length+7)/8; i++){
+		int iter = code_left < 8 ? code_left : 8 ; 
 		for(int k = 0 ; k < iter ; k++){
-			if( ((cc->code[i] >> 31-k) & 0x00000001) == 1){
+			if( ((cc->code[i] >> 7-k) & 0x01) == 1){
 				printf("1");
 			}else{
 				printf("0");
