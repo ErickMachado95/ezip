@@ -25,7 +25,23 @@ bool compression(FILE* file){
 		print_char_frequency(index_list,256);
 	#endif
 	
-	return true;
+	int char_count = 0; 
+
+	//counts how many characters are actually found in index_list
+	for(int i = 0 ; i < 256; i++){
+		if(index_list[i] != NULL)
+			char_count++;
+	}
+
+	ascii_node** full_list = (ascii_node**) malloc(sizeof(ascii_node*)*char_count);
+
+	for(int i = 0, k = 0 ; (i < 256) && (k < char_count) ; i++){
+		if(index_list[i] != NULL){ 
+			full_list[k++] = index_list[i]; 		
+		}
+	}
+
+	huffman_process(full_list,char_count);	
 }
 
 /* returns a newly initialized ascii_node_list */
@@ -42,7 +58,7 @@ void increment_char_count(ascii_node** list, char ch){
 	
 	uint8_t index = (uint8_t) ch; 
 	if(list[index] == NULL){ 
-		list[index] = new_ascii_node(ch,false); // if no new node yet exists then make one
+		list[index] = new_ascii_node(ch); // if no new node yet exists then make one
 	}else{
 		list[index]->freq++; // updates frequency
 	}
@@ -51,13 +67,13 @@ void increment_char_count(ascii_node** list, char ch){
 /* creates a new ascii node and initializes it (frequency starts at 1) */
 /* input: the character, and it's operation status */
 /* output: new ascii node */
-ascii_node*  new_ascii_node(char ch, bool no_op){
+ascii_node*  new_ascii_node(char ch){
 	ascii_node* an = (ascii_node*) malloc(sizeof(ascii_node)); 
 	an->ascii_char = ch; 
-	an->no_op = no_op; 
 	an->freq = 1; 
-	an->code = NULL; 
-	an->code_length = 0; 	
+	an->cc = (char_code*) malloc(sizeof(char_code));
+	an->cc->length = 0; 	
+	return an;
 }
 
 /* orders a given ascii_list from lowest frequency to highest*/
@@ -67,6 +83,139 @@ void order_list(ascii_node_list* list){
 
 }
 
+
+/*creates a new huff node needed for huffman coding*/
+/*inputs: value (frequency), inter - intermediate node or not, an - ascii_node if applicable */
+/*output: a new huff_node, -1 if memory allocation fails */
+huff_node* new_huff_node(int value,bool inter,ascii_node* an){
+	huff_node* hn = (huff_node*) malloc(sizeof(huff_node)); 
+	hn->value = value; 
+	hn->intermediate = inter; 
+	hn->an = an; 
+	hn->left = NULL; 
+	hn->right = NULL; 
+	return hn;
+}
+
+
+/*huffman process takes an ascii_node list and uses huffman coding to create a code*/
+/*input: ascii_node list*/
+/*output: returns true if succesfully gives code to each character, false otherwise*/
+
+bool huffman_process(ascii_node** list, int list_len){
+	
+	if(list_len == 1){} ; // special case of list being 1	
+	huff_node** huff_tree = (huff_node**) malloc(sizeof(huff_node*)*list_len);
+	
+	//creates a huff node for each character in list
+	for( int i = 0 ; i < list_len ; i++){
+		huff_tree[i] = new_huff_node(list[i]->freq,false,list[i]);	
+	}
+	
+	huff_node dummy_node; 
+	dummy_node.value = 0x7FFFFFFF; 	
+	huff_node* root;
+	for( int i = 0; i < list_len - 1 ; i++){
+		huff_node* min_one = &dummy_node;
+		huff_node* min_two = &dummy_node; 
+		int insert_index = 0 ; 
+		for( int k = 0 ; k < list_len ; k++){
+			if(huff_tree[k] != NULL && huff_tree[k]->value < min_one->value){
+				min_one = huff_tree[k];
+				insert_index = k; 
+			}
+		}
+			
+		huff_tree[insert_index] = NULL;
+
+		for( int j = 0 ; j < list_len ; j++){
+			if(huff_tree[j] != NULL && huff_tree[j]->value < min_two->value){
+				min_two = huff_tree[j]; 
+				insert_index = j; 
+			}
+		}
+
+		if( i == (list_len-2)){
+			root = new_huff_node(min_one->value + min_two->value,true,NULL);
+			root->left = min_one;
+			root->right = min_two; 
+		}else{
+		huff_tree[insert_index] = new_huff_node(min_one->value + min_two->value,true,NULL); 
+		huff_tree[insert_index]->left = min_one; 
+		huff_tree[insert_index]->right = min_two; 		
+		}
+	
+	}
+
+	code_assignment(root);
+	free(huff_tree);
+	return true;	
+}
+
+/*Assigns code to each of the characters found in a file */
+/*input: huffman tree */
+/*output: code assignment */
+void code_assignment(huff_node* tree){
+	char_code* left = (char_code*) malloc(sizeof(char_code)); 
+	char_code* right = (char_code*) malloc(sizeof(char_code));
+	
+	left->length = 1;
+	right->length = 1;
+
+	left->code[0] = left_path(left->code[0],0); 
+	right->code[0] = right_path(right->code[0],0);
+	code_assignment_recurs(tree->left,left);
+	code_assignment_recurs(tree->right,right);
+		
+
+}
+
+/*helper function of code assignment */
+/*input: huffman tree and code that can be assigned */
+/*output: assigns code to a node with no children */
+//Note: passed by value is used for code because it will be easier than constantly allocating 
+//memory for a change. (stack space won't be affected too much)
+void code_assignment_recurs(huff_node* root ,char_code* cd){
+
+	if((root->left == NULL) && (root->right == NULL)){
+		char_code_copy(root->an->cc,cd); 
+		#ifdef DEBUG
+			printf("character %c has: \n\n",root->an->ascii_char);
+			code_print(root->an->cc);	
+		#endif
+	}else{
+		cd->length++; 
+		if(root->left != NULL){
+			char_code* left = (char_code*) malloc(sizeof(char_code));
+			char_code_copy(left,cd); 
+			left->code[left->length/32] = left_path(left->code[left->length/32],(left->length-1)%32);
+			code_assignment_recurs(root->left, left);
+			free(left);
+			
+		}
+
+		if(root->right != NULL){
+			char_code* right = (char_code*) malloc(sizeof(char_code));
+			char_code_copy(right,cd); 
+			right->code[right->length/32] = right_path(right->code[right->length/32],(right->length-1)%32);
+			code_assignment_recurs(root->right,right);
+			free(right);
+		}
+	}
+
+}
+
+/* copies char_code of src to dest*/ 
+void char_code_copy(char_code* dest, char_code* src){
+	
+	for(int i = 0 ; i < 8 ; i++){
+		dest->code[i] = src->code[i];
+	}
+	
+	dest->length = src->length; 
+}
+
+/* debug functions */
 
 /*prints the frequency of characters found in a file */
 /*input: list of ascii nodes */
@@ -82,3 +231,27 @@ void print_char_frequency(ascii_node** list, int length){
 	}
 }
 
+void code_print(char_code* cc){
+	
+	printf("code length: %i\n\n path/code: ",cc->length);
+	int code_left = cc->length;
+
+	/*for(int i = 0; i < 8 ; i++){*/
+
+		/*printf("%x ",cc->code[i]) ; */
+	/*}*/
+	for(int i = 0 ; i < (cc->length+31)/32 ; i++){
+		int iter = code_left < 32 ? code_left : 32 ; 
+		for(int k = 0 ; k < iter ; k++){
+			if( ((cc->code[i] >> 31-k) & 0x00000001) == 1){
+				printf("1");
+			}else{
+				printf("0");
+			}
+		}
+		code_left - iter; 
+
+	}
+
+	printf("\n\n");
+}
