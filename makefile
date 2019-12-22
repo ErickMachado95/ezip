@@ -1,9 +1,12 @@
-ezip : ezip.o compression.o
-	gcc -o ezip ezip.o compression.o
+ezip : ezip.o compression.o decompression.o
+	gcc -o ezip ezip.o compression.o decompression.o
 
 
 compression.o: compression.c 
 	gcc -c compression.c
+
+decompression.o: decompression.c
+	gcc -c decompression.c
 
 ezip.o: ezip.c
 	gcc -c ezip.c

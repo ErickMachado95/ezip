@@ -6,7 +6,7 @@
 #include "compression.h"
 
 //comment out for debugging purposes
-#define DEBUG 
+//#define DEBUG 
 
 bool compression(FILE* file, FILE* comp_file){
 	
@@ -210,12 +210,12 @@ void code_assignment_recurs(huff_node* root ,char_code* cd){
 			printf("character %c has: \n\n",root->an->ascii_char);
 			code_print(root->an->cc);	
 		#endif
-	}else{
-		cd->length++; 
+	}else{	
 		if(root->left != NULL){
 			char_code* left = (char_code*) malloc(sizeof(char_code));
 			char_code_copy(left,cd); 
-			left->code[left->length/8] = left_path(left->code[left->length/8],(left->length-1)%8);
+			left->code[left->length/8] = left_path(left->code[left->length/8],left->length%8);
+			left->length++;
 			code_assignment_recurs(root->left, left);
 			free(left);
 			
@@ -224,7 +224,8 @@ void code_assignment_recurs(huff_node* root ,char_code* cd){
 		if(root->right != NULL){
 			char_code* right = (char_code*) malloc(sizeof(char_code));
 			char_code_copy(right,cd); 
-			right->code[right->length/8] = right_path(right->code[right->length/8],(right->length-1)%8);
+			right->code[right->length/8] = right_path(right->code[right->length/8],right->length%8);
+			right->length++;
 			code_assignment_recurs(root->right,right);
 			free(right);
 		}
@@ -273,8 +274,8 @@ bool write_compressed_file(FILE* src, FILE* dest,ascii_node** list,int list_len,
 			char temp;
 			for(int i = 0; i < iter; i++){
 				temp = (char) cc->code[code_index/8]; 
-				temp = temp & (0x01 << (7-(code_index%8))); 
-				data = data | (temp); 	
+				temp = 0x01 & (temp >> (7-(code_index%8))); 
+				data = data | (temp << (char_left-1)); 	
 				code_index++; 
 				char_left--; 
 			}	
@@ -282,14 +283,20 @@ bool write_compressed_file(FILE* src, FILE* dest,ascii_node** list,int list_len,
 			if(char_left == 0){
 				char_left = 8; 
 				fwrite(&data,sizeof(char),1,dest);
-				/*#ifdef DEBUG*/
-					/*printf("%c",data);*/
-				/*#endif*/
+				#ifdef DEBUG
+					printf("%x\n",(uint8_t)data);
+				#endif
+				data = 0;
 			}		
 		}
 
 		ch = getc(src);
 
+	}
+
+	if(char_left != 0 && char_left != 8){
+
+		fwrite(&data,sizeof(char),1,dest);
 	}
 	return true;
 

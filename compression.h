@@ -1,5 +1,5 @@
-#ifndef EZIP_H
-#define EZIP_H
+#ifndef COMPRESS_H
+#define COMPRESS_H
 
 #include <stdio.h>
 #include <stdint.h>
