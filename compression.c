@@ -313,6 +313,8 @@ void write_huffman_tree(FILE* file, huff_node* root){
 		write_huffman_tree(file,root->left);
 		write_huffman_tree(file,root->right);
 	}
+
+	free(root); // we will no longer need this 
 }
 
 /* debug functions */
