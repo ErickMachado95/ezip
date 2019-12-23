@@ -13,13 +13,16 @@ bool compression(FILE* file, FILE* comp_file){
 	ascii_node** index_list = (ascii_node**) malloc(sizeof(ascii_node*)*256);
 	if(index_list == NULL) 
 		return false; // failed to compress
-	
-	char ch = getc(file); 
 
-	while( ch != EOF){ 
-		
+
+	fseek(file,0,SEEK_END);	
+	uint64_t length_of_file = ftell(file);
+	char ch;
+	rewind(file);
+	for(uint64_t i = 0; i < length_of_file ; i++){ 
+					
+		fread(&ch,sizeof(char),1,file);
 		increment_char_count(index_list,ch);
-		ch = getc(file);
 	}
 
 	rewind(file);
@@ -52,7 +55,7 @@ bool compression(FILE* file, FILE* comp_file){
 	
 	huff_node* root = huffman_process(full_list,char_count);
 	
-	write_compressed_file(file, comp_file,index_list,char_count,root);
+	write_compressed_file(file,length_of_file,comp_file,index_list,char_count,root);
 
 	for( int i = 0 ; i < char_count; i++){
 		free_ascii_node(full_list[i]);	
@@ -61,12 +64,6 @@ bool compression(FILE* file, FILE* comp_file){
 	free(index_list);
 }
 
-/* returns a newly initialized ascii_node_list */
-/*input: slots to be initialized (length) */
-/*output: new ascii node list, (returns -1 if fails) */
-ascii_node_list* new_ascii_node_list(int init_len){			
-
-}
 
 /*increments a characters frequency value*/
 /*input: index list and the character to be incremented */
@@ -102,12 +99,6 @@ void free_ascii_node(ascii_node* an){
 	free(an); 
 }
 
-/* orders a given ascii_list from lowest frequency to highest*/
-/*input: ascii_node_list */
-/*output: ordered list */
-void order_list(ascii_node_list* list){
-
-}
 
 
 /*creates a new huff node needed for huffman coding*/
@@ -246,29 +237,21 @@ void char_code_copy(char_code* dest, char_code* src){
 /* writes to compressed version of a file */
 /*input: file to be compressed (src), compression destination (dest), ascii_node list that holds code*/
 /*output: true if successful, false otherwise */
-bool write_compressed_file(FILE* src, FILE* dest,ascii_node** list,int list_len, huff_node* root){
+bool write_compressed_file(FILE* src,uint64_t src_length, FILE* dest,ascii_node** list,int list_len, huff_node* root){
 	
-	uint32_t byte_count = 0; // assumes files will be no larger than 1GB /*may be changed later for larger files */
-	char ch = getc(src);
-        while(ch != EOF){
-		byte_count++;
-		ch = getc(src);
-	}
-
-
-	rewind(src);
-	fwrite(&byte_count, sizeof(uint32_t),1,dest);
+	fwrite(&src_length, sizeof(uint64_t),1,dest);
 	write_huffman_tree(dest,root);		
 
-	ch = getc(src);
+	char ch;	
 	uint8_t index; 
 	char data =0 ; 
 	char_code* cc; 
 	uint8_t char_left = 8; 
-	while(ch != EOF){
+	for(int k = 0 ; k < src_length; k++){
+		fread(&ch,sizeof(char),1,src);
 		index = (uint8_t) ch; 	
 		cc = list[index]->cc;
-		uint32_t code_index = 0;	
+		uint16_t code_index = 0;	
 		while(code_index < cc->length){
 			int iter = (cc->length-code_index) < char_left ? (cc->length-code_index) : char_left;
 			char temp;
@@ -289,8 +272,6 @@ bool write_compressed_file(FILE* src, FILE* dest,ascii_node** list,int list_len,
 				data = 0;
 			}		
 		}
-
-		ch = getc(src);
 
 	}
 
@@ -328,7 +309,7 @@ void print_char_frequency(ascii_node** list, int length){
 
 	for(int i = 0 ; i < length ; i++){
 		if(list[i] != NULL) { 
-			printf("c: %c  f: %i \n\n",list[i]->ascii_char,list[i]->freq);
+			printf("c: %c  f: %lu \n\n",list[i]->ascii_char,list[i]->freq);
 		}
 	}
 }

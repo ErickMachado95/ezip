@@ -1,26 +1,26 @@
 # ezip
-compression for text files
+compression for text files <br /> 
+<br /> 
+Description: <br /> 
+-c - Allows for compression <br /> 
+-d - Allows for decompression <br /> 
+<br /> 
+for compression run program as is: <br /> 
+	./ezip -c file1 file2 <br /> 
+<br /> 
+file1 - original file to be compressed <br /> 
+file2 - name of the compressed file (file cannot already exist) <br /> 
 
-Description:
--c - Allows for compression
--d - Allows for decompression
-
-for compression run program as is: 
-	./ezip -c file1 file2
-
-file1 - original file to be compressed
-file2 - name of the compressed file (file cannot already exist)
-
-
-for decompression run program as is:
-	./ezip -d file1 file2
-
-file1 - compressed file
-file2 - name of the decompressed file (file cannot already exist)
-
-Building: 
-To build ezip, simply run make
-
+<br /> 
+for decompression run program as is: <br /> 
+	./ezip -d file1 file2 <br /> 
+<br /> 
+file1 - compressed file <br /> 
+file2 - name of the decompressed file (file cannot already exist) <br /> 
+<br /> 
+Building: <br /> 
+To build ezip, simply run make <br /> 
+<br /> 
 NOTE: THIS PROGRAM CAN ONLY COMPRESS FILES THAT ARE SMALLER THAN 4GB, AN UPDATED VERSION IS EXPECTED IN THE FUTURE TO HANDLE LARGER FILES
 
 

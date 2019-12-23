@@ -10,7 +10,7 @@
 int main(int argc, char** argv){
 
 	if(argc != 4){ 
-		printf("Error: wrong number of arguments. See README for more information"); 
+		printf("Error: wrong number of arguments. See README for more information\n"); 
 		exit(-1);
 	}
 	
@@ -23,13 +23,13 @@ int main(int argc, char** argv){
 		FILE* file = fopen(argv[2],"r"); 
 		
 		if(file == NULL){ 
-			printf("Error: could not open file %s",argv[2]); 
+			printf("Error: could not open file %s\n",argv[2]); 
 			exit(-1);
 		}
 
 
 		if(fopen(argv[3],"r") != NULL){// checks if file already exists
-			printf("Error: file %s already exists",argv[3]);	
+			printf("Error: file %s already exists\n",argv[3]);	
 			fclose(file);	
 			exit(-1);
 			
@@ -47,13 +47,13 @@ int main(int argc, char** argv){
 		FILE* comp_file = fopen(argv[2],"r"); 
 		
 		if(comp_file == NULL){ 
-			printf("Error: could not open file %s",argv[2]); 
+			printf("Error: could not open file %s\n",argv[2]); 
 			exit(-1);
 		}
 
 
 		if(fopen(argv[3],"r") != NULL){// checks if file already exists
-			printf("Error: file %s already exists",argv[3]);	
+			printf("Error: file %s already exists\n",argv[3]);	
 			fclose(comp_file);	
 			exit(-1);
 			
@@ -67,7 +67,7 @@ int main(int argc, char** argv){
 
 	}else{
 
-		printf("Error: Wrong parameters, use -c for compression and -d for decompression");
+		printf("Error: Wrong parameters, use -c for compression and -d for decompression\n");
 		exit(-1);
 	}
 }

@@ -1,5 +1,6 @@
 ezip : ezip.o compression.o decompression.o
 	gcc -o ezip ezip.o compression.o decompression.o
+	rm ezip.o compression.o decompression.o
 
 
 compression.o: compression.c 
@@ -12,7 +13,7 @@ ezip.o: ezip.c
 	gcc -c ezip.c
 
 remove_o: 
-	rm ezip.o compression.o
+	rm ezip.o compression.o decompression.o
 
 clean: 
 	rm ezip

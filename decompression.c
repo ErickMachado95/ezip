@@ -8,8 +8,8 @@ bool decompress(FILE* comp_file, FILE* decomp_file){
 
 
 
-	uint32_t file_size; 
-	fread(&file_size,sizeof(uint32_t),1,comp_file);
+	uint64_t file_size; 
+	fread(&file_size,sizeof(uint64_t),1,comp_file);
 
 	dec_node* root = make_tree(comp_file); 		
 
