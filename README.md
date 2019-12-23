@@ -21,6 +21,6 @@ file2 - name of the decompressed file (file cannot already exist) <br />
 Building: <br /> 
 To build ezip, simply run make <br /> 
 <br /> 
-NOTE: THIS PROGRAM CAN ONLY COMPRESS FILES THAT ARE SMALLER THAN 4GB, AN UPDATED VERSION IS EXPECTED IN THE FUTURE TO HANDLE LARGER FILES
+
 
 
